@@ -68,6 +68,9 @@ export function mountApp(root: HTMLElement): void {
     reDisassemble: () => {
       data.disasm = disassemble(data.mem, data.rom.prg.length);
     },
+    loadRom: (bytes, name) => {
+      load(bytes, name);
+    },
   });
 
   const renderContent = (): void => {
