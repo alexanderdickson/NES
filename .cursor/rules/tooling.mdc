@@ -1,0 +1,28 @@
+---
+description: Project tooling preferences and conventions
+alwaysApply: true
+---
+
+# Tooling preferences
+
+These are the maintainer's preferred tools for this repository. Use them by
+default and do not swap them out for alternatives without being asked.
+
+- **Language**: Vanilla TypeScript. No UI framework (no React/Vue/Svelte).
+- **Package manager**: pnpm (never npm or yarn for installs/scripts).
+- **Bundler / dev server**: Vite.
+- **Type checker**: tsgo (the native preview compiler from
+  `@typescript/native-preview`), invoked for `typecheck` / as part of `build`.
+  Prefer `tsgo` over `tsc` for type checking.
+- **Linter**: Oxlint (`oxlint`), configured via `.oxlintrc.json`.
+- **Formatter**: Oxfmt (`oxfmt`). Do not use Prettier/Biome/dprint.
+
+## Common commands
+
+- Install: `pnpm install`
+- Dev server: `pnpm dev`
+- Build (typecheck + bundle): `pnpm build`
+- Type check only: `pnpm typecheck`
+- Lint: `pnpm lint` (autofix: `pnpm lint:fix`)
+- Format: `pnpm fmt` (check only: `pnpm fmt:check`)
+- Full check (typecheck + lint + format check): `pnpm check`
