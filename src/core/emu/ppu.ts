@@ -5,7 +5,7 @@ export const SCREEN_WIDTH = 256;
 export const SCREEN_HEIGHT = 240;
 
 const DOTS_PER_SCANLINE = 341;
-const PRE_RENDER_LINE = 261;
+const NTSC_PRE_RENDER_LINE = 261;
 
 function paletteIndex(addr: number): number {
   let i = addr & 0x1f;
@@ -41,9 +41,10 @@ export class Ppu {
   private writeToggle = 0;
   private readBuffer = 0;
 
-  private scanline = PRE_RENDER_LINE;
+  private scanline: number;
   private dot = 0;
   private nmiOutput = false;
+  private readonly preRenderLine: number;
 
   private ntLatch = 0;
   private atLatch = 0;
@@ -54,12 +55,18 @@ export class Ppu {
   private atShiftLo = 0;
   private atShiftHi = 0;
 
-  constructor(private readonly mapper: Mapper) {}
+  constructor(
+    private readonly mapper: Mapper,
+    preRenderLine: number = NTSC_PRE_RENDER_LINE,
+  ) {
+    this.preRenderLine = preRenderLine;
+    this.scanline = preRenderLine;
+  }
 
   reset(): void {
     this.ctrl = 0;
     this.mask = 0;
-    this.scanline = PRE_RENDER_LINE;
+    this.scanline = this.preRenderLine;
     this.dot = 0;
     this.frameComplete = false;
   }
@@ -411,7 +418,7 @@ export class Ppu {
   /** Advance one PPU dot. */
   step(): void {
     const visible = this.scanline < SCREEN_HEIGHT;
-    const preRender = this.scanline === PRE_RENDER_LINE;
+    const preRender = this.scanline === this.preRenderLine;
 
     if ((visible || preRender) && this.renderingEnabled()) {
       if ((this.dot >= 1 && this.dot <= 256) || (this.dot >= 321 && this.dot <= 336)) {
@@ -421,6 +428,8 @@ export class Ppu {
       if (this.dot === 256) this.incrementVertical();
       if (this.dot === 257) this.transferX();
       if (preRender && this.dot >= 280 && this.dot <= 304) this.transferY();
+      // Approximate MMC3-style scanline IRQ clock once per line.
+      if (this.dot === 260) this.mapper.onScanlineTick?.();
     }
 
     if (visible && this.dot === 257 && this.renderingEnabled()) {
@@ -446,7 +455,7 @@ export class Ppu {
     if (this.dot >= DOTS_PER_SCANLINE) {
       this.dot = 0;
       this.scanline += 1;
-      if (this.scanline > PRE_RENDER_LINE) {
+      if (this.scanline > this.preRenderLine) {
         this.scanline = 0;
         this.frameCount += 1;
         this.frameComplete = true;

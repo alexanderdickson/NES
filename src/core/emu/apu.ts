@@ -1,9 +1,49 @@
+import type { Region } from "../rom.ts";
+
 const LENGTH_TABLE = [
   10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192,
   24, 72, 26, 16, 28, 32, 30,
 ];
-const NOISE_PERIODS = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
-const DMC_RATES = [428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54];
+const NTSC_NOISE_PERIODS = [
+  4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
+];
+const PAL_NOISE_PERIODS = [
+  4, 8, 14, 30, 60, 88, 118, 148, 188, 236, 354, 472, 708, 944, 1890, 3778,
+];
+const NTSC_DMC_RATES = [
+  428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54,
+];
+const PAL_DMC_RATES = [398, 354, 316, 298, 276, 236, 210, 198, 176, 148, 132, 118, 98, 78, 66, 50];
+
+const NTSC_CPU_CLOCK = 1789773;
+const PAL_CPU_CLOCK = 1662607;
+// Frame-counter trigger cycles: [q1, q2(+half), q3, q4(4-step end), q5(5-step end)].
+const NTSC_FRAME_STEPS = [7457, 14913, 22371, 29829, 37281];
+const PAL_FRAME_STEPS = [8313, 16627, 24939, 33253, 41565];
+
+interface RegionTiming {
+  cpuClock: number;
+  noise: readonly number[];
+  dmc: readonly number[];
+  frameSteps: readonly number[];
+}
+
+function regionTiming(region: Region): RegionTiming {
+  if (region === "pal") {
+    return {
+      cpuClock: PAL_CPU_CLOCK,
+      noise: PAL_NOISE_PERIODS,
+      dmc: PAL_DMC_RATES,
+      frameSteps: PAL_FRAME_STEPS,
+    };
+  }
+  return {
+    cpuClock: NTSC_CPU_CLOCK,
+    noise: NTSC_NOISE_PERIODS,
+    dmc: NTSC_DMC_RATES,
+    frameSteps: NTSC_FRAME_STEPS,
+  };
+}
 const DUTY_SEQUENCES = [
   [0, 1, 0, 0, 0, 0, 0, 0],
   [0, 1, 1, 0, 0, 0, 0, 0],
@@ -14,8 +54,6 @@ const TRIANGLE_SEQUENCE = [
   15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
   13, 14, 15,
 ];
-
-const CPU_CLOCK = 1789773;
 
 export type ChannelName = "pulse1" | "pulse2" | "triangle" | "noise" | "dmc";
 
@@ -206,6 +244,8 @@ class NoiseChannel {
   private timer = 0;
   private timerPeriod = 0;
 
+  constructor(private readonly periods: readonly number[]) {}
+
   write(reg: number, value: number): void {
     switch (reg & 3) {
       case 0:
@@ -216,7 +256,7 @@ class NoiseChannel {
         break;
       case 2:
         this.mode = (value & 0x80) !== 0;
-        this.timerPeriod = NOISE_PERIODS[value & 0x0f] ?? 4;
+        this.timerPeriod = this.periods[value & 0x0f] ?? 4;
         break;
       case 3:
         if (this.enabled) this.length = LENGTH_TABLE[value >> 3] ?? 0;
@@ -271,12 +311,14 @@ class DmcChannel {
 
   read: (addr: number) => number = () => 0;
 
+  constructor(private readonly rates: readonly number[]) {}
+
   write(reg: number, value: number): void {
     switch (reg & 3) {
       case 0:
         this.irqEnabled = (value & 0x80) !== 0;
         this.loop = (value & 0x40) !== 0;
-        this.rate = DMC_RATES[value & 0x0f] ?? 428;
+        this.rate = this.rates[value & 0x0f] ?? 428;
         if (!this.irqEnabled) this.irqFlag = false;
         break;
       case 1:
@@ -358,8 +400,8 @@ export class Apu {
   private readonly pulse1 = new PulseChannel(false);
   private readonly pulse2 = new PulseChannel(true);
   private readonly triangle = new TriangleChannel();
-  private readonly noise = new NoiseChannel();
-  private readonly dmc = new DmcChannel();
+  private readonly noise: NoiseChannel;
+  private readonly dmc: DmcChannel;
 
   readonly mute: Record<ChannelName, boolean> = {
     pulse1: false,
@@ -386,8 +428,13 @@ export class Apu {
   readonly scope = new Float32Array(1024);
   private scopePtr = 0;
 
-  constructor(sampleRate = 44100) {
+  private readonly timing: RegionTiming;
+
+  constructor(sampleRate = 44100, region: Region = "ntsc") {
     this.sampleRate = sampleRate;
+    this.timing = regionTiming(region);
+    this.noise = new NoiseChannel(this.timing.noise);
+    this.dmc = new DmcChannel(this.timing.dmc);
     this.ring = new Float32Array(this.ringSize);
   }
 
@@ -471,25 +518,26 @@ export class Apu {
   }
 
   private clockFrameCounter(): void {
+    const [s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0] = this.timing.frameSteps;
     this.frameCycle += 1;
     if (!this.fiveStep) {
-      if (this.frameCycle === 7457) this.clockQuarterFrame();
-      else if (this.frameCycle === 14913) {
+      if (this.frameCycle === s1) this.clockQuarterFrame();
+      else if (this.frameCycle === s2) {
         this.clockQuarterFrame();
         this.clockHalfFrame();
-      } else if (this.frameCycle === 22371) this.clockQuarterFrame();
-      else if (this.frameCycle === 29829) {
+      } else if (this.frameCycle === s3) this.clockQuarterFrame();
+      else if (this.frameCycle === s4) {
         this.clockQuarterFrame();
         this.clockHalfFrame();
         if (!this.irqInhibit) this.frameIrq = true;
         this.frameCycle = 0;
       }
-    } else if (this.frameCycle === 7457) this.clockQuarterFrame();
-    else if (this.frameCycle === 14913) {
+    } else if (this.frameCycle === s1) this.clockQuarterFrame();
+    else if (this.frameCycle === s2) {
       this.clockQuarterFrame();
       this.clockHalfFrame();
-    } else if (this.frameCycle === 22371) this.clockQuarterFrame();
-    else if (this.frameCycle === 37281) {
+    } else if (this.frameCycle === s3) this.clockQuarterFrame();
+    else if (this.frameCycle === s5) {
       this.clockQuarterFrame();
       this.clockHalfFrame();
       this.frameCycle = 0;
@@ -509,8 +557,8 @@ export class Apu {
     this.clockFrameCounter();
 
     this.sampleAccumulator += this.sampleRate;
-    if (this.sampleAccumulator >= CPU_CLOCK) {
-      this.sampleAccumulator -= CPU_CLOCK;
+    if (this.sampleAccumulator >= this.timing.cpuClock) {
+      this.sampleAccumulator -= this.timing.cpuClock;
       this.emitSample();
     }
   }
