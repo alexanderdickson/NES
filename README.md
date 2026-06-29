@@ -2,6 +2,23 @@
 
 A NES emulator written in TypeScript utilising modern web technologies and with debugging tools.
 
+## Disassembler
+
+The first tool is a browser-based **NES ROM disassembler / explorer** (`pnpm dev`). It loads
+iNES (`.nes`) ROMs (or a built-in generated sample ROM) and provides:
+
+- **Recursive-descent disassembly** — seeds from the RESET/NMI/IRQ vectors and follows
+  `JSR`/`JMP`/branches to classify bytes as code vs. data, auto-generating `sub_`/`loc_`
+  labels. Unreached bytes are shown as `.byte` data. The full 6502 instruction set is
+  supported, including undocumented opcodes (flagged in the listing).
+- **Memory peek/poke** — a paged hex viewer over the CPU address space
+  (`$0000–$1FFF` RAM mirrored, IO registers, PRG-ROM at `$8000–$FFFF`). Click a byte to
+  select it, then peek/poke values. Poking PRG-ROM re-runs the disassembly.
+- **Tile (CHR) viewer** — decodes CHR pattern tables into 8×8 tiles rendered on a canvas,
+  with selectable pattern table, palette and zoom.
+- **Palette viewer** — the full NES 64-colour master palette plus editable 4-colour
+  working palettes that drive the tile viewer.
+
 ## Tech stack
 
 - **TypeScript** (vanilla, no UI framework)
