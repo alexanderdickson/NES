@@ -69,8 +69,18 @@ through the Web Audio API, two **controllers**, and a system **bus** wiring it a
 A companion **Audio** tab shows live per-channel level meters, per-channel mute toggles and a
 mixed-output oscilloscope.
 
-Controls: arrow keys = D-pad, `Z` = A, `X` = B, `Enter` = Start, `Shift` = Select. Audio
-needs a user gesture, so click **Enable audio** once.
+Default controls: arrow keys = D-pad, `Z` = A, `X` = B, `Enter` = Start, `Right Shift` =
+Select. Audio needs a user gesture, so click **Enable audio** once.
+
+Toolbar options:
+
+- **Load ROM…** — pick any iNES (`.nes`) file from your filesystem (also available in the
+  top header).
+- **Scale** — 1× to 4× integer scaling (nearest-neighbour, no blur).
+- **Scanlines** — Off / Light / Medium / Heavy CRT-style horizontal scanline overlay.
+- **Region** — Auto (from the header), or force NTSC / PAL.
+- **Configure controls** — expand to rebind any button: click a key, then press the keyboard
+  key to assign it (Esc cancels). Bindings persist in `localStorage`.
 
 ### Mappers
 
