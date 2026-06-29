@@ -182,15 +182,28 @@ pnpm dev
 
 ## Scripts
 
-| Command          | Description                                        |
-| ---------------- | -------------------------------------------------- |
-| `pnpm dev`       | Start the Vite dev server                          |
-| `pnpm build`     | Type check (tsgo) and bundle for production        |
-| `pnpm preview`   | Preview the production build                       |
-| `pnpm typecheck` | Type check with tsgo                               |
-| `pnpm lint`      | Lint with Oxlint (`pnpm lint:fix` to autofix)      |
-| `pnpm fmt`       | Format with Oxfmt (`pnpm fmt:check` to check only) |
-| `pnpm check`     | Run typecheck + lint + format check                |
+| Command          | Description                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| `pnpm dev`       | Start the Vite dev server                                    |
+| `pnpm build`     | Type check (tsgo) and bundle for production                  |
+| `pnpm preview`   | Preview the production build                                 |
+| `pnpm typecheck` | Type check with tsgo                                         |
+| `pnpm lint`      | Lint with Oxlint (`pnpm lint:fix` to autofix)                |
+| `pnpm fmt`       | Format with Oxfmt (`pnpm fmt:check` to check only)           |
+| `pnpm test`      | Run the test suite with Vitest (`test:watch` for watch mode) |
+| `pnpm check`     | Run typecheck + lint + format check + tests                  |
+
+## Testing
+
+Tests live in `test/` and run with [Vitest](https://vitest.dev) (`pnpm test`).
+
+The headline test is **CPU conformance via `nestest`** (`test/cpu.nestest.test.ts`): it runs
+the canonical `nestest` ROM — ~9000 instructions covering every documented and undocumented
+6502 opcode and addressing mode — and compares the CPU's `PC`, `A`, `X`, `Y`, `P` (flags),
+`SP` and cumulative cycle count against the reference log **before every instruction**. It
+also asserts the program's final pass codes in zero page (`$0002`/`$0003` = `$00`/`$00`). The
+golden log is stored gzip-compressed and decompressed in-memory at test time. See
+[`test/fixtures/README.md`](test/fixtures/README.md) for attribution.
 
 ## PR preview deployments
 
