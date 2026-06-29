@@ -32,4 +32,30 @@ pnpm dev
 | `pnpm fmt`       | Format with Oxfmt (`pnpm fmt:check` to check only) |
 | `pnpm check`     | Run typecheck + lint + format check                |
 
+## PR preview deployments
+
+Every pull request is built and deployed to a temporary GitHub Pages URL by the
+[`PR Preview`](.github/workflows/pr-preview.yml) workflow. The preview link is
+posted as a comment on the PR and removed automatically when the PR is closed.
+
+Preview URL pattern:
+
+```
+https://<owner>.github.io/<repo>/pr-preview/pr-<number>/
+```
+
+### One-time setup (repo admin)
+
+The workflow needs GitHub Pages enabled before previews can publish:
+
+1. **Settings → Actions → General → Workflow permissions** → enable
+   _Read and write permissions_.
+2. Push/merge once so the `gh-pages` branch is created (the first PR run will
+   create it).
+3. **Settings → Pages → Build and deployment** → Source: _Deploy from a branch_,
+   Branch: `gh-pages` / `/ (root)`.
+
+The repo must be public (or on a plan that allows Pages) for the preview URLs to
+be reachable.
+
 See [glossary.md](./glossary.md) for project terminology.
