@@ -306,3 +306,52 @@ button.primary {
   text-align: center;
   padding: 3rem;
 }
+
+.emu-canvas {
+  image-rendering: pixelated;
+  display: block;
+  background: #000;
+}
+
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 560px;
+  margin-bottom: 1.25rem;
+}
+.meter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.meter-label {
+  width: 5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.meter {
+  flex: 1;
+  height: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #57d38c, #6ea8fe);
+  transition: width 0.05s linear;
+}
+.mute-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.scope {
+  display: block;
+  border-radius: 6px;
+}
