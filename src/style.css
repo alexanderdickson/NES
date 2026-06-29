@@ -307,10 +307,55 @@ button.primary {
   padding: 3rem;
 }
 
+.emu-screen {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
 .emu-canvas {
   image-rendering: pixelated;
   display: block;
   background: #000;
+}
+.scanline-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.input-config {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+.input-config summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.bind-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  max-width: 640px;
+}
+.bind-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.bind-label {
+  color: var(--muted);
+}
+.bind-key {
+  min-width: 5.5rem;
+  font-family: ui-monospace, monospace;
+}
+.bind-key.listening {
+  outline: 2px solid var(--accent);
+  color: var(--accent);
 }
 
 .meters {
