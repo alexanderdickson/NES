@@ -5,9 +5,12 @@ import type { Palette } from "../core/ppu.ts";
 import { parseRom, RomParseError } from "../core/rom.ts";
 import { AddressSpace } from "../core/memory.ts";
 import { disassemble } from "../core/disassembler.ts";
-import { buildSampleRom } from "../core/sampleRom.ts";
+import { buildDemoRom } from "../core/emu/demoRom.ts";
+import { isMapperSupported } from "../core/emu/mappers.ts";
 import { DEFAULT_PALETTES } from "../core/ppu.ts";
 import { clear, el } from "./dom.ts";
+import { renderEmulator } from "./emulatorView.ts";
+import { renderApu } from "./apuView.ts";
 import { renderDisassembly } from "./disassemblyView.ts";
 import { renderMemory } from "./memoryView.ts";
 import { renderTiles } from "./tilesView.ts";
@@ -22,15 +25,17 @@ interface Loaded {
 const clonePalette = (p: Palette): Palette => [p[0], p[1], p[2], p[3]];
 
 const TABS: ReadonlyArray<{ id: string; label: string; render: ViewRenderer }> = [
+  { id: "emulator", label: "Emulator", render: renderEmulator },
   { id: "disasm", label: "Disassembly", render: renderDisassembly },
   { id: "memory", label: "Memory (peek/poke)", render: renderMemory },
   { id: "tiles", label: "Tiles", render: renderTiles },
   { id: "palettes", label: "Palettes", render: renderPalettes },
+  { id: "audio", label: "Audio", render: renderApu },
 ];
 
 export function mountApp(root: HTMLElement): void {
   let loaded: Loaded | null = null;
-  let activeTab = "disasm";
+  let activeTab = "emulator";
   const palettes: Palette[] = DEFAULT_PALETTES.map(clonePalette);
   let activePalette = 0;
 
@@ -62,6 +67,9 @@ export function mountApp(root: HTMLElement): void {
     },
     reDisassemble: () => {
       data.disasm = disassemble(data.mem, data.rom.prg.length);
+    },
+    loadRom: (bytes, name) => {
+      load(bytes, name);
     },
   });
 
@@ -101,7 +109,10 @@ export function mountApp(root: HTMLElement): void {
     if (!loaded) return;
     const { rom } = loaded;
     const facts: Array<[string, string]> = [
-      ["Mapper", String(rom.mapper)],
+      [
+        "Mapper",
+        `${String(rom.mapper)}${isMapperSupported(rom.mapper) ? "" : " (unsupported → NROM)"}`,
+      ],
       ["PRG-ROM", `${String(rom.prgBanks16k)} × 16 KiB (${String(rom.prg.length)} B)`],
       [
         "CHR",
@@ -110,6 +121,7 @@ export function mountApp(root: HTMLElement): void {
           : `${String(rom.chrBanks8k)} × 8 KiB (${String(rom.chr.length)} B)`,
       ],
       ["Mirroring", rom.mirroring],
+      ["Region", rom.region.toUpperCase()],
       ["Battery", rom.hasBattery ? "yes" : "no"],
       ["Trainer", rom.hasTrainer ? "yes" : "no"],
     ];
@@ -151,17 +163,20 @@ export function mountApp(root: HTMLElement): void {
   });
 
   const sampleBtn = el("button", {
-    text: "Load sample ROM",
+    text: "Load demo ROM",
     class: "primary",
     onclick: () => {
-      load(buildSampleRom(), "sample.nes");
+      load(buildDemoRom(), "demo.nes");
     },
   });
 
   const header = el("header", { class: "app-header" }, [
     el("div", { class: "title-row" }, [
-      el("h1", { text: "NES Disassembler" }),
-      el("span", { class: "subtitle", text: "recursive scan · peek/poke · CHR & palette viewer" }),
+      el("h1", { text: "NES Emulator & Toolkit" }),
+      el("span", {
+        class: "subtitle",
+        text: "emulation · audio · disassembly · peek/poke · CHR & palette · APU monitor",
+      }),
     ]),
     el("div", { class: "controls" }, [
       el("label", { class: "file-label" }, ["Open .nes", fileInput]),
@@ -174,6 +189,6 @@ export function mountApp(root: HTMLElement): void {
   renderContent();
   root.append(header, infoPanel, tabBar, content);
 
-  // Start with the sample ROM so the UI is immediately explorable.
-  load(buildSampleRom(), "sample.nes");
+  // Start with the demo ROM so the emulator and tools are immediately usable.
+  load(buildDemoRom(), "demo.nes");
 }

@@ -13,6 +13,8 @@ export interface AppContext {
   setPaletteColor(paletteIndex: number, slot: number, master: number): void;
   /** Re-run the recursive scan (e.g. after poking PRG-ROM). */
   reDisassemble(): void;
+  /** Load a different ROM from raw bytes (rebuilds all views). */
+  loadRom(bytes: Uint8Array, name: string): void;
 }
 
 export type ViewRenderer = (container: HTMLElement, ctx: AppContext) => void;

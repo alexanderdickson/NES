@@ -61,6 +61,65 @@ Shows the full NES 64-colour master palette and four editable 4-colour **working
 Click a master colour to select it, then click a palette slot to assign it. The working
 palettes drive the Tiles view.
 
+## The emulator
+
+The **Emulator** tab runs the cartridge on a full console (`src/core/emu/`): a 6502/2A03
+**CPU**, the 2C02 **PPU** rendering to a canvas, the 2A03 **APU** mixing five audio channels
+through the Web Audio API, two **controllers**, and a system **bus** wiring it all together.
+A companion **Audio** tab shows live per-channel level meters, per-channel mute toggles and a
+mixed-output oscilloscope.
+
+Default controls: arrow keys = D-pad, `Z` = A, `X` = B, `Enter` = Start, `Right Shift` =
+Select. Audio needs a user gesture, so click **Enable audio** once.
+
+Toolbar options:
+
+- **Load ROM…** — pick any iNES (`.nes`) file from your filesystem (also available in the
+  top header).
+- **Scale** — 1× to 4× integer scaling (nearest-neighbour, no blur).
+- **Scanlines** — Off / Light / Medium / Heavy CRT-style horizontal scanline overlay.
+- **Region** — Auto (from the header), or force NTSC / PAL.
+- **Configure controls** — expand to rebind any button: click a key, then press the keyboard
+  key to assign it (Esc cancels). Bindings persist in `localStorage`.
+
+### Mappers
+
+The cartridge mapper is selected automatically from the iNES header. The following are
+implemented; anything else falls back to NROM behaviour so the ROM still loads (the info bar
+flags it as `unsupported → NROM`):
+
+| #   | Mapper       | Notes                                  |
+| --- | ------------ | -------------------------------------- |
+| 0   | NROM         | fixed PRG, fixed CHR                   |
+| 1   | MMC1         | PRG/CHR banking + mirroring control    |
+| 2   | UxROM        | 16K PRG bank switch, CHR-RAM           |
+| 3   | CNROM        | 8K CHR bank switch                     |
+| 4   | MMC3         | PRG/CHR banking + scanline IRQ         |
+| 7   | AxROM        | 32K PRG bank + single-screen mirroring |
+| 9   | MMC2         | CHR latch (Punch-Out!!)                |
+| 10  | MMC4         | CHR latch + 16K PRG                    |
+| 11  | Color Dreams | 32K PRG + 8K CHR select                |
+| 66  | GxROM        | 32K PRG + 8K CHR select                |
+| 71  | Camerica     | UxROM-style 16K PRG bank               |
+
+> "Support all mappers" isn't a finite target — there are 250+ iNES mapper numbers, many
+> undocumented. The set above covers the overwhelming majority of the licensed library
+> (MMC1/MMC3/UxROM/NROM alone account for most games). The MMC3 scanline IRQ is clocked once
+> per rendered scanline, which is accurate enough for the common cases but not a true PPU A12
+> edge counter. New mappers slot in via `createMapper()` in `mappers.ts`.
+
+### Region: NTSC & PAL
+
+The region is detected from the iNES header (byte 9 bit 0, with byte 10 as a fallback) and
+can be overridden from the **Region** selector in the emulator toolbar. PAL differs from NTSC
+in several timed subsystems, all parameterised by region:
+
+- **Console** — PAL clocks the PPU at 3.2 dots per CPU cycle (averaged as a 3,3,3,3,4
+  pattern) versus 3 on NTSC.
+- **PPU** — 312 scanlines (pre-render line 311) versus 262 (261) on NTSC.
+- **APU** — PAL noise-period and DMC-rate tables, PAL frame-counter step cadence, and the
+  1.662 MHz PAL CPU clock for sample timing.
+
 ## Architecture & reuse for the emulator
 
 The code is split into a UI-agnostic **core** and a thin **UI** layer so that the building
@@ -99,9 +158,9 @@ PPU, APU and mapper. Because both satisfy `Memory`, every debugging tool works u
 against the live machine. Likewise `decodeInstruction()` and the opcode table (with cycle
 counts) are exactly what a CPU step + disassembling trace logger need.
 
-> Current simplifications to revisit when the emulator lands: only NROM is mapper-accurate
-> (larger PRG maps the last 32 KiB), indirect `JMP` isn't statically followed, and
-> page-cross / branch-taken cycle penalties are left for the CPU core to apply.
+> The static analysis tools still use the simplified `AddressSpace` (NROM-style mapping);
+> the live emulator uses the full `Bus` + mapper set documented above. Indirect `JMP` isn't
+> statically followed by the disassembler.
 
 ## Tech stack
 
@@ -123,15 +182,28 @@ pnpm dev
 
 ## Scripts
 
-| Command          | Description                                        |
-| ---------------- | -------------------------------------------------- |
-| `pnpm dev`       | Start the Vite dev server                          |
-| `pnpm build`     | Type check (tsgo) and bundle for production        |
-| `pnpm preview`   | Preview the production build                       |
-| `pnpm typecheck` | Type check with tsgo                               |
-| `pnpm lint`      | Lint with Oxlint (`pnpm lint:fix` to autofix)      |
-| `pnpm fmt`       | Format with Oxfmt (`pnpm fmt:check` to check only) |
-| `pnpm check`     | Run typecheck + lint + format check                |
+| Command          | Description                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| `pnpm dev`       | Start the Vite dev server                                    |
+| `pnpm build`     | Type check (tsgo) and bundle for production                  |
+| `pnpm preview`   | Preview the production build                                 |
+| `pnpm typecheck` | Type check with tsgo                                         |
+| `pnpm lint`      | Lint with Oxlint (`pnpm lint:fix` to autofix)                |
+| `pnpm fmt`       | Format with Oxfmt (`pnpm fmt:check` to check only)           |
+| `pnpm test`      | Run the test suite with Vitest (`test:watch` for watch mode) |
+| `pnpm check`     | Run typecheck + lint + format check + tests                  |
+
+## Testing
+
+Tests live in `test/` and run with [Vitest](https://vitest.dev) (`pnpm test`).
+
+The headline test is **CPU conformance via `nestest`** (`test/cpu.nestest.test.ts`): it runs
+the canonical `nestest` ROM — ~9000 instructions covering every documented and undocumented
+6502 opcode and addressing mode — and compares the CPU's `PC`, `A`, `X`, `Y`, `P` (flags),
+`SP` and cumulative cycle count against the reference log **before every instruction**. It
+also asserts the program's final pass codes in zero page (`$0002`/`$0003` = `$00`/`$00`). The
+golden log is stored gzip-compressed and decompressed in-memory at test time. See
+[`test/fixtures/README.md`](test/fixtures/README.md) for attribution.
 
 ## PR preview deployments
 

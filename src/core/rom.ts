@@ -1,10 +1,12 @@
 export type Mirroring = "horizontal" | "vertical" | "four-screen";
+export type Region = "ntsc" | "pal";
 
 export interface NesRom {
   readonly prg: Uint8Array;
   readonly chr: Uint8Array;
   readonly mapper: number;
   readonly mirroring: Mirroring;
+  readonly region: Region;
   readonly hasBattery: boolean;
   readonly hasTrainer: boolean;
   /** CHR is RAM (no CHR-ROM present in the file) when true. */
@@ -48,6 +50,13 @@ export function parseRom(bytes: Uint8Array): NesRom {
 
   const mapper = (flags7 & 0xf0) | (flags6 >> 4);
 
+  // Region: iNES byte 9 bit0 (0=NTSC, 1=PAL); byte 10 bits1-0 (2 or 3 => PAL)
+  // is also honoured as a fallback since byte 9 is often left zero.
+  const flags9 = bytes[9] ?? 0;
+  const flags10 = bytes[10] ?? 0;
+  const isPal = (flags9 & 0x01) !== 0 || (flags10 & 0x03) === 2 || (flags10 & 0x03) === 3;
+  const region: Region = isPal ? "pal" : "ntsc";
+
   const prgSize = prgBanks16k * PRG_BANK;
   const chrSize = chrBanks8k * CHR_BANK;
 
@@ -74,6 +83,7 @@ export function parseRom(bytes: Uint8Array): NesRom {
     chr,
     mapper,
     mirroring,
+    region,
     hasBattery,
     hasTrainer,
     usesChrRam,

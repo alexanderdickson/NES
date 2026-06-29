@@ -12,7 +12,9 @@
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run fmt:check"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run fmt:check && pnpm run test"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
@@ -20,7 +22,8 @@
     "oxfmt": "^0.56.0",
     "oxlint": "^1.71.0",
     "typescript": "^5.9.0",
-    "vite": "^8.1.0"
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
   },
   "packageManager": "pnpm@10.33.3"
 }
