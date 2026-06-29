@@ -1,4 +1,4 @@
-import type { NesRom } from "../core/rom.ts";
+import type { NesRom, Region } from "../core/rom.ts";
 import type { Button } from "../core/emu/controller.ts";
 import { Nes } from "../core/emu/nes.ts";
 
@@ -38,6 +38,8 @@ class EmuEngine {
   private audioNode: ScriptProcessorNode | null = null;
   private readonly keyDown: (e: KeyboardEvent) => void;
   private readonly keyUp: (e: KeyboardEvent) => void;
+  /** null = auto-detect from the ROM header. */
+  regionOverride: Region | null = null;
 
   constructor(public rom: NesRom) {
     this.nes = new Nes(rom, SAMPLE_RATE);
@@ -76,8 +78,15 @@ class EmuEngine {
   }
 
   reset(): void {
-    this.nes = new Nes(this.rom, SAMPLE_RATE);
+    this.nes = new Nes(this.rom, SAMPLE_RATE, this.regionOverride ?? this.rom.region);
     this.lastError = null;
+  }
+
+  /** Force a region (or pass null to follow the ROM header) and restart. */
+  setRegion(region: Region | null): void {
+    this.regionOverride = region;
+    this.reset();
+    this.notify();
   }
 
   stepFrame(): void {

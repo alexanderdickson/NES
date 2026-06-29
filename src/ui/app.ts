@@ -6,6 +6,7 @@ import { parseRom, RomParseError } from "../core/rom.ts";
 import { AddressSpace } from "../core/memory.ts";
 import { disassemble } from "../core/disassembler.ts";
 import { buildDemoRom } from "../core/emu/demoRom.ts";
+import { isMapperSupported } from "../core/emu/mappers.ts";
 import { DEFAULT_PALETTES } from "../core/ppu.ts";
 import { clear, el } from "./dom.ts";
 import { renderEmulator } from "./emulatorView.ts";
@@ -105,7 +106,10 @@ export function mountApp(root: HTMLElement): void {
     if (!loaded) return;
     const { rom } = loaded;
     const facts: Array<[string, string]> = [
-      ["Mapper", String(rom.mapper)],
+      [
+        "Mapper",
+        `${String(rom.mapper)}${isMapperSupported(rom.mapper) ? "" : " (unsupported → NROM)"}`,
+      ],
       ["PRG-ROM", `${String(rom.prgBanks16k)} × 16 KiB (${String(rom.prg.length)} B)`],
       [
         "CHR",
@@ -114,6 +118,7 @@ export function mountApp(root: HTMLElement): void {
           : `${String(rom.chrBanks8k)} × 8 KiB (${String(rom.chr.length)} B)`,
       ],
       ["Mirroring", rom.mirroring],
+      ["Region", rom.region.toUpperCase()],
       ["Battery", rom.hasBattery ? "yes" : "no"],
       ["Trainer", rom.hasTrainer ? "yes" : "no"],
     ];

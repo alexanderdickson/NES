@@ -68,6 +68,25 @@ export const renderEmulator: ViewRenderer = (container, ctx) => {
     scaleSel.append(opt);
   }
 
+  const regionSel = el("select", {
+    onchange: (event) => {
+      const value = (event.target as HTMLSelectElement).value;
+      engine.setRegion(value === "auto" ? null : (value as "ntsc" | "pal"));
+      draw();
+    },
+  });
+  const currentRegion = engine.regionOverride ?? "auto";
+  const regionOptions: Array<[string, string]> = [
+    ["auto", `Auto (${ctx.rom.region.toUpperCase()})`],
+    ["ntsc", "NTSC"],
+    ["pal", "PAL"],
+  ];
+  for (const [value, label] of regionOptions) {
+    const opt = el("option", { value, text: label });
+    if (value === currentRegion) opt.selected = true;
+    regionSel.append(opt);
+  }
+
   const toolbar = el("div", { class: "toolbar" }, [
     runBtn,
     el("button", { text: "Step frame", onclick: () => engine.stepFrame() }),
@@ -81,6 +100,8 @@ export const renderEmulator: ViewRenderer = (container, ctx) => {
     audioBtn,
     el("label", { text: "Scale:" }),
     scaleSel,
+    el("label", { text: "Region:" }),
+    regionSel,
     status,
   ]);
 
