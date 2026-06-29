@@ -4,18 +4,48 @@ import { Nes } from "../core/emu/nes.ts";
 
 const SAMPLE_RATE = 44100;
 const AUDIO_BUFFER = 1024;
+const BINDINGS_KEY = "nes.bindings.v1";
 
-const KEY_MAP: Record<string, Button> = {
-  KeyZ: "a",
-  KeyX: "b",
-  Enter: "start",
-  ShiftRight: "select",
-  ShiftLeft: "select",
-  ArrowUp: "up",
-  ArrowDown: "down",
-  ArrowLeft: "left",
-  ArrowRight: "right",
+/** NES buttons in the order shown by the input-config UI. */
+export const BUTTONS: readonly Button[] = [
+  "up",
+  "down",
+  "left",
+  "right",
+  "a",
+  "b",
+  "start",
+  "select",
+];
+
+export type Bindings = Record<Button, string>;
+
+const DEFAULT_BINDINGS: Bindings = {
+  up: "ArrowUp",
+  down: "ArrowDown",
+  left: "ArrowLeft",
+  right: "ArrowRight",
+  a: "KeyZ",
+  b: "KeyX",
+  start: "Enter",
+  select: "ShiftRight",
 };
+
+function loadBindings(): Bindings {
+  try {
+    const raw = localStorage.getItem(BINDINGS_KEY);
+    if (!raw) return { ...DEFAULT_BINDINGS };
+    const parsed = JSON.parse(raw) as Partial<Bindings>;
+    const result = { ...DEFAULT_BINDINGS };
+    for (const button of BUTTONS) {
+      const code = parsed[button];
+      if (typeof code === "string") result[button] = code;
+    }
+    return result;
+  } catch {
+    return { ...DEFAULT_BINDINGS };
+  }
+}
 
 type Listener = () => void;
 
@@ -40,9 +70,12 @@ class EmuEngine {
   private readonly keyUp: (e: KeyboardEvent) => void;
   /** null = auto-detect from the ROM header. */
   regionOverride: Region | null = null;
+  private bindings: Bindings = loadBindings();
+  private keyToButton = new Map<string, Button>();
 
   constructor(public rom: NesRom) {
     this.nes = new Nes(rom, SAMPLE_RATE);
+    this.rebuildKeyMap();
     this.keyDown = (e) => this.handleKey(e, true);
     this.keyUp = (e) => this.handleKey(e, false);
     window.addEventListener("keydown", this.keyDown);
@@ -51,8 +84,46 @@ class EmuEngine {
     this.rafId = requestAnimationFrame(this.loop);
   }
 
+  private rebuildKeyMap(): void {
+    this.keyToButton.clear();
+    for (const button of BUTTONS) {
+      this.keyToButton.set(this.bindings[button], button);
+    }
+  }
+
+  /** Current key code bound to each NES button (a copy). */
+  getBindings(): Bindings {
+    return { ...this.bindings };
+  }
+
+  /** Bind a keyboard `event.code` to a button; the code is freed from any other button. */
+  setBinding(button: Button, code: string): void {
+    for (const b of BUTTONS) {
+      if (this.bindings[b] === code) this.bindings[b] = "";
+    }
+    this.bindings[button] = code;
+    this.persistBindings();
+    this.rebuildKeyMap();
+    this.notify();
+  }
+
+  resetBindings(): void {
+    this.bindings = { ...DEFAULT_BINDINGS };
+    this.persistBindings();
+    this.rebuildKeyMap();
+    this.notify();
+  }
+
+  private persistBindings(): void {
+    try {
+      localStorage.setItem(BINDINGS_KEY, JSON.stringify(this.bindings));
+    } catch {
+      // Ignore storage failures (private mode, quota, etc.).
+    }
+  }
+
   private handleKey(e: KeyboardEvent, pressed: boolean): void {
-    const button = KEY_MAP[e.code];
+    const button = this.keyToButton.get(e.code);
     if (!button) return;
     e.preventDefault();
     this.nes.setButton(button, pressed);
