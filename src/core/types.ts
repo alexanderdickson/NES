@@ -18,6 +18,12 @@ export interface Opcode {
   readonly mode: AddressingMode;
   /** Documented (legal) opcode? */
   readonly official: boolean;
+  /**
+   * Base cycle count for the instruction. The CPU core adds the usual
+   * +1 for page-crossing on indexed reads and +1/+2 for taken branches.
+   * "Jam" (KIL) opcodes are reported as 0.
+   */
+  readonly cycles: number;
 }
 
 /** Number of operand bytes that follow the opcode for a given addressing mode. */

@@ -1,4 +1,4 @@
-import type { AddressSpace } from "./memory.ts";
+import type { MemoryReader } from "./memory.ts";
 import type { Opcode } from "./types.ts";
 import { getOpcode, instructionLength } from "./opcodes.ts";
 import { OPERAND_BYTES } from "./types.ts";
@@ -43,7 +43,11 @@ export interface DisassemblyResult {
   };
 }
 
-function decodeAt(mem: AddressSpace, addr: number): Instruction {
+/**
+ * Decode a single instruction at `addr` using any {@link MemoryReader}. Shared
+ * by the recursive scanner and reusable by the future emulator's debugger/trace.
+ */
+export function decodeInstruction(mem: MemoryReader, addr: number): Instruction {
   const opByte = mem.read(addr);
   const opcode = getOpcode(opByte);
   const length = instructionLength(opcode);
@@ -76,7 +80,7 @@ function inRange(addr: number, start: number, end: number): boolean {
 }
 
 function recursiveScan(
-  mem: AddressSpace,
+  mem: MemoryReader,
   entries: readonly number[],
   start: number,
   end: number,
@@ -90,7 +94,7 @@ function recursiveScan(
     let addr = queue.pop() as number;
 
     while (inRange(addr, start, end) && !instructions.has(addr)) {
-      const instr = decodeAt(mem, addr);
+      const instr = decodeInstruction(mem, addr);
       instructions.set(addr, instr);
 
       const { mnemonic, mode } = instr.opcode;
@@ -128,7 +132,7 @@ function recursiveScan(
 }
 
 function buildLabels(
-  mem: AddressSpace,
+  mem: MemoryReader,
   scan: ScanState,
   start: number,
   end: number,
@@ -147,9 +151,9 @@ function buildLabels(
   for (const t of scan.jsrTargets) named(t, "sub");
   for (const t of scan.branchTargets) named(t, "loc");
   // Vector names take precedence.
-  named(mem.resetVector, "reset");
-  named(mem.nmiVector, "nmi");
-  named(mem.irqVector, "irq");
+  named(mem.readWord(0xfffc), "reset");
+  named(mem.readWord(0xfffa), "nmi");
+  named(mem.readWord(0xfffe), "irq");
   return labels;
 }
 
@@ -189,7 +193,7 @@ function formatOperand(instr: Instruction, labels: ReadonlyMap<number, string>):
 }
 
 function buildListing(
-  mem: AddressSpace,
+  mem: MemoryReader,
   scan: ScanState,
   labels: ReadonlyMap<number, string>,
   start: number,
@@ -247,12 +251,12 @@ function buildListing(
   return { lines, codeBytes, dataBytes };
 }
 
-export function disassemble(mem: AddressSpace, prgLength: number): DisassemblyResult {
+export function disassemble(mem: MemoryReader, prgLength: number): DisassemblyResult {
   const window = Math.min(prgLength, 0x8000);
   const start = 0x10000 - window;
   const end = 0xffff;
 
-  const entries = [mem.resetVector, mem.nmiVector, mem.irqVector].filter((a) =>
+  const entries = [mem.readWord(0xfffc), mem.readWord(0xfffa), mem.readWord(0xfffe)].filter((a) =>
     inRange(a, start, end),
   );
 

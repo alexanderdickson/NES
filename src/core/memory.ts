@@ -1,5 +1,25 @@
 import type { NesRom } from "./rom.ts";
 
+/** Read side of a CPU bus. Implemented by tools and the future emulator bus. */
+export interface MemoryReader {
+  read(addr: number): number;
+  /** Read a little-endian 16-bit word. */
+  readWord(addr: number): number;
+}
+
+/** Write side of a CPU bus. */
+export interface MemoryWriter {
+  write(addr: number, value: number): void;
+}
+
+/**
+ * The full read/write contract for a CPU-visible address space. The
+ * disassembler, hex viewer and any future debugger/tracer depend only on this
+ * interface, so the same tools work against the real emulator bus once it
+ * exists — the emulator simply provides a hardware-accurate implementation.
+ */
+export type Memory = MemoryReader & MemoryWriter;
+
 /**
  * A simplified CPU address-space model used for static analysis, peeking and
  * poking. It is accurate for NROM and a reasonable approximation for larger
@@ -11,7 +31,7 @@ import type { NesRom } from "./rom.ts";
  *   $4020-$7FFF  expansion / PRG-RAM (flat editable buffer)
  *   $8000-$FFFF  PRG-ROM (mapped from the cartridge)
  */
-export class AddressSpace {
+export class AddressSpace implements Memory {
   private readonly ram = new Uint8Array(0x0800);
   private readonly io = new Uint8Array(0x2020); // $2000-$401F
   private readonly expansion = new Uint8Array(0x4000); // $4020-$7FFF
